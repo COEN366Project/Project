@@ -1,6 +1,7 @@
 /*
  * Jonathan Mehmannavaz
- * V1: 2/16/2025
+ * Hagop Minassian 
+ * V2: 2/16/2025
  */
 
 import java.net.*;
@@ -11,8 +12,19 @@ public class Serveur {
     private static final int SERVER_PORT = 5000; // Value chosen
     private static final int BUFFER_SIZE = 1024; // Value chosen
     private static Map<String, ClientInfo> clients = new HashMap<>(); // "Database" use for now until creation of database class
-    
+    private static DBClass db = new DBClass("auction_data.csv");
     public static void main(String[] args) {
+
+        //testing the DB
+        db.addItem("Laptop", "Gaming laptop", "1000", "7 days");
+        System.out.println(db.getItem("Laptop"));
+        db.addItem("Gaming PC", "Gaming Desktop Computer", "1500", "8 days");
+        System.out.println(db.getItem("Gaming PC"));
+        System.out.println(db.listItems());
+        db.removeItem("Laptop");
+        System.out.println(db.listItems());
+
+
     	// Open the socket using UDP DatagramSockets
         try (DatagramSocket serverSocket = new DatagramSocket(SERVER_PORT)) {
             System.out.println("Server is running on port " + SERVER_PORT);
