@@ -14,7 +14,7 @@ public class Serveur {
     private static Map<String, ClientInfo> clients = new HashMap<>(); // "Database" use for now until creation of database class
     private static DBClass db = new DBClass("auction_data.csv");
     public static void main(String[] args) {
-
+        System.out.println("##### DATABASE TESTING BEGIN #######");
         //testing the DB
         db.addItem("Laptop", "Gaming laptop", "1000", "7 days");
         System.out.println(db.getItem("Laptop"));
@@ -23,7 +23,7 @@ public class Serveur {
         System.out.println(db.listItems());
         db.removeItem("Laptop");
         System.out.println(db.listItems());
-
+        System.out.println("##### DATABASE TESTING END #######");
 
     	// Open the socket using UDP DatagramSockets
         try (DatagramSocket serverSocket = new DatagramSocket(SERVER_PORT)) {
