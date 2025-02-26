@@ -88,14 +88,14 @@ public class Serveur {
             // See map if it contain the name 
             if (clients.containsKey(name)) {
             	// Send invalid message using the require format for invalid name
-                return "REGISTER-DENIED " + requestId + " Name Already Taken";
+                return "REGISTER-DENIED " + requestId +" " +  name + " Name Already Taken";
             }
             
             // if not add to the map 
             clients.put(name, new ClientInfo(name, role, ip, udpPort, tcpPort));
             
             //Send valid message using the require format for registering
-            return "REGISTERED " + requestId;
+            return name +" "+ "REGISTERED " + requestId;
         } 
         // if command is to de-register
         else if (command.equals("DE-REGISTER")) {
@@ -107,7 +107,7 @@ public class Serveur {
             clients.remove(name);
             
             //Send valid message using the require format for de-registering
-            return "DE-REGISTERED " + requestId;
+            return name + " " + "DE-REGISTERED " + requestId;
         }
         
         // when anything
