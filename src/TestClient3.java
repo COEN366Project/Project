@@ -2,18 +2,18 @@ import java.net.*;
 import java.io.*;
 import java.util.Scanner;
 
-public class TestClient2 {
+public class TestClient3 {
     private static final String SERVER_IP = "127.0.0.1";
     private static final int SERVER_PORT = 5000;
-    private static final int TCP_PORT = 7002;
+    private static final int TCP_PORT = 7003;
     private DatagramSocket socket;
     private InetAddress serverAddress;
-    private int requestId = 200;
+    private int requestId = 300;
 
-    public TestClient2() throws Exception {
+    public TestClient3() throws Exception {
         socket = new DatagramSocket();
         serverAddress = InetAddress.getByName(SERVER_IP);
-        System.out.println("Bob (Seller) started on port: " + socket.getLocalPort());
+        System.out.println("Alice (Buyer) started on port: " + socket.getLocalPort());
 
         // Start TCP listener
         new Thread(this::listenTCP).start();
@@ -26,18 +26,12 @@ public class TestClient2 {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
                 String msg = reader.readLine();
-                System.out.println("[TCP -> Bob] " + msg);
+                System.out.println("[TCP -> Alice] " + msg);
 
-                if (msg.startsWith("NEGOTIATE_REQ")) {
+                if (msg.startsWith("INFORM_Req")) {
                     String[] parts = msg.split(" ");
                     String rq = parts[1];
-                    String item = parts[2];
-                    String newPrice = String.valueOf(Double.parseDouble(parts[3]) - 50);
-                    writer.println("ACCEPT " + rq + " " + item + " " + newPrice);
-                } else if (msg.startsWith("INFORM_Req")) {
-                    String[] parts = msg.split(" ");
-                    String rq = parts[1];
-                    writer.println("INFORM_Res " + rq + " Bob 9999-8888-7777-6666 12/26 123_Seller_Street");
+                    writer.println("INFORM_Res " + rq + " Alice 4444-3333-2222-1111 01/27 789_Buyer_Street");
                 }
 
                 clientSocket.close();
@@ -65,13 +59,14 @@ public class TestClient2 {
 
     public static void main(String[] args) {
         try {
-            TestClient2 client = new TestClient2();
+            TestClient3 client = new TestClient3();
             Scanner scanner = new Scanner(System.in);
 
-            System.out.println("\n--- Bob (Seller) Menu ---");
+            System.out.println("\n--- Alice (Buyer) Menu ---");
             System.out.println("1. Register");
-            System.out.println("2. List Item");
-            System.out.println("3. Deregister");
+            System.out.println("2. Subscribe to Item");
+            System.out.println("3. Bid on Item");
+            System.out.println("4. Deregister");
             System.out.println("0. Exit");
 
             while (true) {
@@ -84,9 +79,10 @@ public class TestClient2 {
                         System.out.println("Disconnected.");
                         return;
                     }
-                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Bob seller 127.0.0.1 " + client.socket.getLocalPort() + " " + TCP_PORT);
-                    case 2 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " Camera NikonD750 500 5s");
-                    case 3 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Bob");
+                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Alice buyer 127.0.0.1 " + client.socket.getLocalPort() + " " + TCP_PORT);
+                    case 2 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " Camera");
+                    case 3 -> client.sendMessage("BID " + client.requestId++ + " Camera 550");
+                    case 4 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Alice");
                     default -> System.out.println("Invalid option.");
                 }
             }

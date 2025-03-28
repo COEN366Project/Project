@@ -1,21 +1,27 @@
 Item_Name,Item_Description,Start_Price,Duration
-Gaming PC,Gaming Desktop Computer,1500,8 days
-Gaming Desktop Computer,1500,Gaming PC,8 days
-1500,Gaming PC,Gaming Desktop Computer,8 days
-Gaming PC,Gaming Desktop Computer,1500,8 days
-Gaming Desktop Computer,1500,Gaming PC,8 days
-1500,Gaming PC,Gaming Desktop Computer,8 days
-Gaming PC,Gaming Desktop Computer,1500,8 days
-Gaming Desktop Computer,1500,Gaming PC,8 days
-1500,Gaming PC,Gaming Desktop Computer,8 days
-Gaming PC,Gaming Desktop Computer,1500,8 days
-Gaming Desktop Computer,1500,Gaming PC,8 days
-1500,Gaming PC,Gaming Desktop Computer,8 days
-Gaming PC,Gaming Desktop Computer,1500,8 days
-Gaming Desktop Computer,1500,Gaming PC,8 days
-1500,Gaming PC,Gaming Desktop Computer,8 days
-Gaming PC,Gaming Desktop Computer,1500,8 days
-Gaming Desktop Computer,1500,Gaming PC,8 days
-1500,Gaming PC,Gaming Desktop Computer,8 days
-500,Camera,NikonD750,5d
-500,Camera,NikonD750,5d
+1500,Gaming PC,Gaming Desktop Computer,8s
+Gaming PC,Gaming Desktop Computer,1500,8s
+Gaming Desktop Computer,1500,Gaming PC,8s
+1500,Gaming PC,Gaming Desktop Computer,8s
+Gaming PC,Gaming Desktop Computer,1500,8s
+Gaming Desktop Computer,1500,Gaming PC,8s
+1500,Gaming PC,Gaming Desktop Computer,8s
+Gaming PC,Gaming Desktop Computer,1500,8s
+Gaming Desktop Computer,1500,Gaming PC,8s
+1500,Gaming PC,Gaming Desktop Computer,8s
+Gaming PC,Gaming Desktop Computer,1500,8s
+Gaming Desktop Computer,1500,Gaming PC,8s
+1500,Gaming PC,Gaming Desktop Computer,8s
+Gaming PC,Gaming Desktop Computer,1500,8s
+Gaming Desktop Computer,1500,Gaming PC,8s
+1500,Gaming PC,Gaming Desktop Computer,8s
+Gaming PC,Gaming Desktop Computer,1500,8s
+Gaming Desktop Computer,1500,Gaming PC,8s
+NikonD750,500,Camera,5s
+NikonD750,500,Camera,5s
+500,Camera,NikonD750,5s
+500,Camera,NikonD750,5s
+Camera,NikonD750,500,5s
+NikonD750,500,Camera,5s
+500,Camera,NikonD750,5s
+500,Camera,NikonD750,5s
