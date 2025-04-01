@@ -1,131 +1,305 @@
 /*
- * Jonathan Mehmannavaz
- * Hagop Minassian 
- * V2: 2/16/2025
+ * Full Auction Lifecycle Server - COEN366 Project (Duration in Seconds)
  */
 
-import java.net.*;
-import java.util.*;
-
-public class Serveur {
-	// Global variable
-    private static final int SERVER_PORT = 5000; // Value chosen
-    private static final int BUFFER_SIZE = 1024; // Value chosen
-    private static Map<String, ClientInfo> clients = new HashMap<>(); // "Database" use for now until creation of database class
-    private static DBClass db = new DBClass("auction_data.csv");
-    public static void main(String[] args) {
-        System.out.println("##### DATABASE TESTING BEGIN #######");
-        //testing the DB
-        db.addItem("Laptop", "Gaming laptop", "1000", "7 days");
-        System.out.println(db.getItem("Laptop"));
-        db.addItem("Gaming PC", "Gaming Desktop Computer", "1500", "8 days");
-        System.out.println(db.getItem("Gaming PC"));
-        System.out.println(db.listItems());
-        db.removeItem("Laptop");
-        System.out.println(db.listItems());
-        System.out.println("##### DATABASE TESTING END #######");
-
-    	// Open the socket using UDP DatagramSockets
-        try (DatagramSocket serverSocket = new DatagramSocket(SERVER_PORT)) {
-            System.out.println("Server is running on port " + SERVER_PORT);
-            byte[] receiveBuffer = new byte[BUFFER_SIZE];
-            
-            while (true) {
-            	// Receive packet variable creation
-                DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, BUFFER_SIZE);
-                
-                // Receive the packet from the socket (serverSocket) to the packet (receivePacket)
-                serverSocket.receive(receivePacket);
-                
-                // To string
-                String message = new String(receivePacket.getData(), 0, receivePacket.getLength());
-                
-                // Process the response to send from the function processMessage()
-                String response = processMessage(message);
-                
-                // response to byte (packet)
-                byte[] sendBuffer = response.getBytes();
-                
-                // Send packet variable creation
-                DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, receivePacket.getAddress(), receivePacket.getPort());
-                
-             // Send the packet
-                serverSocket.send(sendPacket);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Function to process the string that comes from the packet 
-    private static String processMessage(String message) {
-        // Data separated with spaces
-    	String[] parts = message.split(" ");
-        
-        // Register has 7 parts and de-register has 3 parts
-        if (parts.length < 2 ) {
-            return "INVALID REQUEST";
-        }
-
-        // The two first variable received
-        String command = parts[0];
-        String requestId = parts[1];
-
-        // If command is to register
-        if (command.equals("REGISTER")) {
-            
-        	// Send invalid message using the require format for invalid request parameter
-        	if (parts.length < 6) 
-            	return "REGISTER-DENIED " + requestId + " Invalid Request Parameters";
-            
-            // The 5 other variable received
-            String name = parts[2];
-            String role = parts[3];
-            String ip = parts[4];
-            int udpPort = Integer.parseInt(parts[5]);
-            int tcpPort = Integer.parseInt(parts[6]);
-            
-            // See map if it contain the name 
-            if (clients.containsKey(name)) {
-            	// Send invalid message using the require format for invalid name
-                return "REGISTER-DENIED " + requestId +" " +  name + " Name Already Taken";
-            }
-            
-            // if not add to the map 
-            clients.put(name, new ClientInfo(name, role, ip, udpPort, tcpPort));
-            
-            //Send valid message using the require format for registering
-            return name +" "+ "REGISTERED " + requestId;
-        } 
-        // if command is to de-register
-        else if (command.equals("DE-REGISTER")) {
-        	// Send invalid message using the require format for invalid request parameter
-            if (parts.length < 3) return "INVALID REQUEST";
-            
-            // Get name and remove it from map
-            String name = parts[2];
-            clients.remove(name);
-            
-            //Send valid message using the require format for de-registering
-            return name + " " + "DE-REGISTERED " + requestId;
-        }
-        
-        // when anything
-        return "UNKNOWN COMMAND";
-    }
-}
-
-// Class for client
-class ClientInfo {
-    String name, role, ip;
-    int udpPort, tcpPort;
-
-    public ClientInfo(String name, String role, String ip, int udpPort, int tcpPort) {
-        this.name = name;
-        this.role = role;
-        this.ip = ip;
-        this.udpPort = udpPort;
-        this.tcpPort = tcpPort;
-    }
-
-}
+ import java.net.*;
+ import java.util.*;
+ import java.io.*;
+ import java.util.concurrent.*;
+ 
+ public class Serveur {
+     private static final int SERVER_PORT = 5000;
+     private static final int TCP_PORT = 6000;
+     private static final int BUFFER_SIZE = 1024;
+     private static final Map<String, ClientInfo> clients = new ConcurrentHashMap<>();
+     private static final Map<String, Set<String>> subscriptions = new ConcurrentHashMap<>();
+     private static final Map<String, Double> currentBids = new ConcurrentHashMap<>();
+     private static final Map<String, String> highestBidders = new ConcurrentHashMap<>();
+     private static final Map<String, Semaphore> auctionLocks = new ConcurrentHashMap<>();
+     private static final Map<String, Auction> auctions = new ConcurrentHashMap<>();
+     private static final DBClass db = new DBClass("auction_data.csv");
+     private static final boolean DEBUG_MODE = true;
+     private static int requestIdCounter = 1000;
+ 
+     public static void main(String[] args) {
+         System.out.println("Server is running on UDP:" + SERVER_PORT + " TCP:" + TCP_PORT);
+         ExecutorService executor = Executors.newFixedThreadPool(20);
+ 
+         if (DEBUG_MODE) {
+             Thread debugConsole = new Thread(() -> runDebugConsole());
+             debugConsole.setDaemon(true);
+             debugConsole.start();
+         }
+ 
+         Thread tcpThread = new Thread(() -> startTCPServer());
+         tcpThread.start();
+ 
+         try (DatagramSocket serverSocket = new DatagramSocket(SERVER_PORT)) {
+             byte[] receiveBuffer = new byte[BUFFER_SIZE];
+             while (true) {
+                 DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, BUFFER_SIZE);
+                 serverSocket.receive(receivePacket);
+                 executor.submit(() -> handlePacket(serverSocket, receivePacket));
+             }
+         } catch (Exception e) {
+             e.printStackTrace();
+         }
+     }
+ 
+     private static void startTCPServer() {
+         try (ServerSocket tcpSocket = new ServerSocket(TCP_PORT)) {
+             while (true) {
+                 Socket socket = tcpSocket.accept();
+                 new Thread(() -> handleTCPConnection(socket)).start();
+             }
+         } catch (IOException e) {
+             e.printStackTrace();
+         }
+     }
+ 
+     private static void handleTCPConnection(Socket socket) {
+         try (
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+ 
+             String line = in.readLine();
+             System.out.println("[TCP Request Received] " + line);
+             String[] parts = line.split(" ");
+             String type = parts[0];
+             String rq = parts[1];
+ 
+             if ("INFORM_Res".equals(type)) {
+                 String name = parts[2];
+                 String cc = parts[3];
+                 String exp = parts[4];
+                 String addr = parts[5];
+                 System.out.println("[INFORM_Res] " + name + " | CC: " + cc + " | Addr: " + addr);
+                 out.println("ACK " + rq);
+             } else if ("ACCEPT".equals(type)) {
+                 String item = parts[2];
+                 String newPrice = parts[3];
+                 currentBids.put(item, Double.parseDouble(newPrice));
+                 broadcastUpdate("PRICE_ADJUSTMENT " + rq + " " + item + " " + newPrice + " 5s", item);
+             } else if ("REFUSE".equals(type)) {
+                 String item = parts[2];
+                 System.out.println("[NEGOTIATION REFUSED] " + item);
+             }
+ 
+             socket.close();
+         } catch (IOException e) {
+             e.printStackTrace();
+         }
+     }
+ 
+     private static void runDebugConsole() {
+         Scanner scanner = new Scanner(System.in);
+         while (true) {
+             System.out.println("\n[DEBUG] Type 1: Clients, 2: Items, 3: Auctions");
+             String input = scanner.nextLine();
+             switch (input.trim()) {
+                 case "1" -> System.out.println("[DEBUG] Registered clients: " + clients.size());
+                 case "2" -> {
+                     List<Map<String, String>> items = db.listItems();
+                     System.out.println("[DEBUG] Items: " + items.size());
+                     for (Map<String, String> item : items) System.out.println("- " + item.get("Item_Name"));
+                 }
+                 case "3" -> {
+                     for (Auction a : auctions.values()) {
+                         System.out.println("[AUCTION] " + a.itemName + " Seller: " + a.sellerName);
+                     }
+                 }
+                 default -> System.out.println("[DEBUG] Invalid option.");
+             }
+         }
+     }
+ 
+     private static void handlePacket(DatagramSocket serverSocket, DatagramPacket packet) {
+         try {
+             String message = new String(packet.getData(), 0, packet.getLength());
+             InetAddress address = packet.getAddress();
+             int port = packet.getPort();
+             System.out.println("[UDP Request Received] From: " + address + ":" + port + " | " + message);
+ 
+             String response = processMessage(message, address, port);
+             byte[] sendBuffer = response.getBytes();
+             serverSocket.send(new DatagramPacket(sendBuffer, sendBuffer.length, address, port));
+ 
+             System.out.println("[UDP Response Sent] To: " + address + ":" + port + " | " + response);
+         } catch (Exception e) {
+             e.printStackTrace();
+         }
+     }
+ 
+     private static String processMessage(String msg, InetAddress ip, int port) {
+         String[] parts = msg.split(" ");
+         String command = parts[0];
+         String rq = parts[1];
+ 
+         switch (command) {
+             case "REGISTER": {
+                 String name = parts[2];
+                 String role = parts[3];
+                 String clientIp = parts[4];
+                 int udpPort = Integer.parseInt(parts[5]);
+                 int tcpPort = Integer.parseInt(parts[6]);
+                 clients.put(name, new ClientInfo(name, role, clientIp, udpPort, tcpPort));
+                 return "REGISTERED " + rq;
+             }
+             case "LIST_ITEM": {
+                 String name = findClientNameByAddress(ip);
+                 String item = parts[2];
+                 String desc = parts[3].replace('_', ' ');
+                 String price = parts[4];
+                 String durationStr = parts[5];
+                 long durationMs = parseDuration(durationStr);
+                 long now = System.currentTimeMillis();
+                 db.addItem(item, desc, price, durationStr);
+                 currentBids.put(item, Double.parseDouble(price));
+                 auctionLocks.put(item, new Semaphore(1));
+                 Auction auction = new Auction(item, name, desc, Double.parseDouble(price), now, now + durationMs, rq);
+                 auctions.put(item, auction);
+                 startAuctionMonitor(auction);
+                 return "ITEM_LISTED " + rq;
+             }
+             case "SUBSCRIBE": {
+                 String name = findClientNameByAddress(ip);
+                 String item = parts[2];
+                 subscriptions.putIfAbsent(item, ConcurrentHashMap.newKeySet());
+                 subscriptions.get(item).add(name);
+                 return "SUBSCRIBED " + rq;
+             }
+             case "BID": {
+                 String item = parts[2];
+                 double amount = Double.parseDouble(parts[3]);
+                 String bidder = findClientNameByAddress(ip);
+                 Semaphore lock = auctionLocks.get(item);
+                 try {
+                     lock.acquire();
+                     if (amount > currentBids.getOrDefault(item, 0.0)) {
+                         currentBids.put(item, amount);
+                         highestBidders.put(item, bidder);
+                         Auction a = auctions.get(item);
+                         broadcastUpdate("BID_UPDATE " + rq + " " + item + " " + amount + " " + bidder + " 5s", item);
+                         a.hasBid = true;
+                         return "BID_ACCEPTED " + rq;
+                     }
+                 } catch (Exception e) {
+                     return "BID_REJECTED " + rq;
+                 } finally {
+                     lock.release();
+                 }
+                 return "BID_REJECTED " + rq + " Too low";
+             }
+             default:
+                 return "UNKNOWN_COMMAND " + rq;
+         }
+     }
+ 
+     private static void startAuctionMonitor(Auction a) {
+         new Thread(() -> {
+             try {
+                 long halfway = a.startTime + (a.endTime - a.startTime) / 2;
+                 while (System.currentTimeMillis() < a.endTime) {
+                     Thread.sleep(1000);
+                     if (!a.negotiationSent && !a.hasBid && System.currentTimeMillis() >= halfway) {
+                         sendNegotiationReq(a);
+                         a.negotiationSent = true;
+                     }
+                 }
+                 finalizeAuction(a);
+             } catch (Exception e) {
+                 e.printStackTrace();
+             }
+         }).start();
+     }
+ 
+     private static void finalizeAuction(Auction a) {
+         if (highestBidders.containsKey(a.itemName)) {
+             String buyer = highestBidders.get(a.itemName);
+             String seller = a.sellerName;
+             double price = currentBids.get(a.itemName);
+             ClientInfo b = clients.get(buyer);
+             ClientInfo s = clients.get(seller);
+             sendTCPMessage(b, "WINNER " + requestIdCounter + " " + a.itemName + " " + price + " " + seller);
+             sendTCPMessage(s, "SOLD " + requestIdCounter + " " + a.itemName + " " + price + " " + buyer);
+             sendTCPMessage(b, "INFORM_Req " + (++requestIdCounter) + " " + a.itemName + " " + price);
+             sendTCPMessage(s, "INFORM_Req " + requestIdCounter + " " + a.itemName + " " + price);
+         } else {
+             sendTCPMessage(clients.get(a.sellerName), "NON_OFFER " + a.requestId + " " + a.itemName);
+         }
+     }
+ 
+     private static void sendTCPMessage(ClientInfo client, String msg) {
+         try (Socket socket = new Socket(client.ip, client.tcpPort);
+              PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+             out.println(msg);
+             System.out.println("[TCP Sent] To: " + client.name + " | " + msg);
+         } catch (IOException e) {
+             System.err.println("[TCP Error] Could not send to " + client.name);
+         }
+     }
+ 
+     private static void broadcastUpdate(String msg, String item) {
+         Set<String> buyers = subscriptions.getOrDefault(item, new HashSet<>());
+         buyers.add(auctions.get(item).sellerName);
+         for (String user : buyers) {
+             ClientInfo client = clients.get(user);
+             try {
+                 DatagramSocket socket = new DatagramSocket();
+                 byte[] buf = msg.getBytes();
+                 DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName(client.ip), client.udpPort);
+                 socket.send(packet);
+                 socket.close();
+                 System.out.println("[UDP Broadcast] Sent to " + user + " | " + msg);
+             } catch (IOException e) {
+                 System.err.println("[UDP Error] Failed to send to " + user);
+             }
+         }
+     }
+ 
+     private static void sendNegotiationReq(Auction a) {
+         ClientInfo seller = clients.get(a.sellerName);
+         String msg = "NEGOTIATE_REQ " + a.requestId + " " + a.itemName + " " + a.startPrice + " 5s";
+         sendTCPMessage(seller, msg);
+     }
+ 
+     private static long parseDuration(String d) {
+         if (d.endsWith("s")) return Integer.parseInt(d.replace("s", "")) * 1000L;
+         return 5000L;
+     }
+ 
+     private static String findClientNameByAddress(InetAddress ip) {
+         return clients.values().stream().filter(c -> c.ip.equals(ip.getHostAddress())).map(c -> c.name).findFirst().orElse(null);
+     }
+ }
+ 
+ class ClientInfo {
+     String name, role, ip;
+     int udpPort, tcpPort;
+     public ClientInfo(String name, String role, String ip, int udpPort, int tcpPort) {
+         this.name = name;
+         this.role = role;
+         this.ip = ip;
+         this.udpPort = udpPort;
+         this.tcpPort = tcpPort;
+     }
+ }
+ 
+ class Auction {
+     String itemName, sellerName, description, requestId;
+     double startPrice;
+     long startTime, endTime;
+     boolean negotiationSent = false;
+     boolean hasBid = false;
+ 
+     public Auction(String itemName, String sellerName, String description, double price, long startTime, long endTime, String rq) {
+         this.itemName = itemName;
+         this.sellerName = sellerName;
+         this.description = description;
+         this.startPrice = price;
+         this.startTime = startTime;
+         this.endTime = endTime;
+         this.requestId = rq;
+     }
+ }
+ 
