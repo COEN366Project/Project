@@ -137,37 +137,91 @@
  
          switch (command) {
              case "REGISTER": {
-                 String name = parts[2];
-                 String role = parts[3];
-                 String clientIp = parts[4];
-                 int udpPort = Integer.parseInt(parts[5]);
-                 int tcpPort = Integer.parseInt(parts[6]);
-                 clients.put(name, new ClientInfo(name, role, clientIp, udpPort, tcpPort));
-                 return "REGISTERED " + rq;
+                String name = parts[2];
+                String role = parts[3];
+                String clientIp = parts[4];
+                int udpPort = Integer.parseInt(parts[5]);
+                int tcpPort = Integer.parseInt(parts[6]);
+
+                for (ClientInfo client : clients.values()) {
+                    if (client.getUdpPort() == udpPort) {
+                        return "REJECTED " + rq + " UDP_PORT_ALREADY_IN_USE";
+                    }
+                }  
+                for (ClientInfo client : clients.values()) {
+                    if (client.getTcpPort() == tcpPort) {
+                        return "REJECTED " + rq + " TCP_PORT_ALREADY_IN_USE";
+                    }
+                }
+                
+                if (clients.containsKey(name)) {
+                    return "REJECTED " + rq + " USER_ALREADY_EXISTS";
+                } else {
+                    clients.put(name, new ClientInfo(name, role, clientIp, udpPort, tcpPort));
+                    return "REGISTERED " + rq;
+                }
              }
              case "LIST_ITEM": {
-                 String name = findClientNameByAddress(ip);
-                 String item = parts[2];
-                 String desc = parts[3].replace('_', ' ');
-                 String price = parts[4];
-                 String durationStr = parts[5];
-                 long durationMs = parseDuration(durationStr);
-                 long now = System.currentTimeMillis();
-                 db.addItem(item, desc, price, durationStr);
-                 currentBids.put(item, Double.parseDouble(price));
-                 auctionLocks.put(item, new Semaphore(1));
-                 Auction auction = new Auction(item, name, desc, Double.parseDouble(price), now, now + durationMs, rq);
-                 auctions.put(item, auction);
-                 startAuctionMonitor(auction);
-                 return "ITEM_LISTED " + rq;
+                String name = findClientNameByAddress(ip);
+
+                // Check if client is a registered seller
+               
+                if (name == null || !clients.containsKey(name)) {
+                    return "LIST_DENIED " + rq;
+                }else{
+                    String item = parts[2];       // Should be "Camera"
+                    String desc = parts[3].replace('_', ' ');      // Should be "NikonD750"
+                    String price = parts[4];      // Should be "500"
+                    String durationStr = parts[5];
+                    long durationMs = parseDuration(durationStr);
+                    long now = System.currentTimeMillis();
+                    db.addItem(item, desc, price, durationStr);
+                    currentBids.put(item, Double.parseDouble(price));
+                    auctionLocks.put(item, new Semaphore(1));
+                    Auction auction = new Auction(item, name, desc, Double.parseDouble(price), now, now + durationMs, rq);
+                    auctions.put(item, auction);
+                    startAuctionMonitor(auction);
+                    //System.out.println("Listed Item Time: " + durationMs); //Enable if you want to check the time at listing. 
+                    return "ITEM_LISTED " + rq;
+                }
              }
              case "SUBSCRIBE": {
-                 String name = findClientNameByAddress(ip);
+                String name = findClientNameByAddress(ip);
+                System.out.println("SUB NAME:"+name);
+                if (name == null || !clients.containsKey(name)) {
+                    return "SUBSCRIPTION_DENIED " + rq;
+                }else{
                  String item = parts[2];
                  subscriptions.putIfAbsent(item, ConcurrentHashMap.newKeySet());
                  subscriptions.get(item).add(name);
                  return "SUBSCRIBED " + rq;
+                }
              }
+
+             case "DE-SUBSCRIBE": {
+                String name = findClientNameByAddress(ip);
+                System.out.println("UNSUB NAME: " + name);
+            
+                if (name == null || !clients.containsKey(name)) {
+                    return "UNSUBSCRIPTION_DENIED " + rq;
+                } else {
+                    String item = parts[2];
+            
+                    // Check if there are subscriptions for the item
+                    if (subscriptions.containsKey(item)) {
+                        Set<String> subscribers = subscriptions.get(item);
+                        if (subscribers.remove(name)) {
+                            return "UNSUBSCRIBED " + rq;
+                        } else {
+                            return "UNSUBSCRIPTION_DENIED " + rq + " NOT_SUBSCRIBED";
+                        }
+                    } else {
+                        return "UNSUBSCRIPTION_DENIED " + rq + " ITEM_NOT_FOUND";
+                    }
+                }
+            }
+            
+
              case "BID": {
                  String item = parts[2];
                  double amount = Double.parseDouble(parts[3]);
@@ -283,6 +337,26 @@
          this.udpPort = udpPort;
          this.tcpPort = tcpPort;
      }
+     public int getUdpPort() {
+        return udpPort;
+    }
+
+    // Optionally, also add getters for tcpPort and others
+    public int getTcpPort() {
+        return tcpPort;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public String getClientIp() {
+        return ip;
+    }
  }
  
  class Auction {

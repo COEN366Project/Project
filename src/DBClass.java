@@ -45,17 +45,37 @@ public class DBClass {
         }
     }
 
-    // Save data to CSV file
-    private void saveToCSV() {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(filePath))) {
-            bw.write(String.join(",", headers) + "\n"); // Write header
-            for (Map<String, String> record : records) {
-                bw.write(String.join(",", record.values()) + "\n");
+ // Save data to CSV file
+private void saveToCSV() {
+    try (BufferedWriter bw = new BufferedWriter(new FileWriter(filePath))) {
+        // Write headers
+        bw.write(String.join(",", headers));
+        bw.newLine();
+
+        // Write each record in the order of headers
+        for (Map<String, String> record : records) {
+            List<String> row = new ArrayList<>();
+            for (String header : headers) {
+                String value = record.getOrDefault(header, "");
+                row.add(escapeCSV(value));
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+            bw.write(String.join(",", row));
+            bw.newLine();
         }
+
+    } catch (IOException e) {
+        e.printStackTrace();
     }
+}
+
+// Escape special characters for proper CSV format
+private String escapeCSV(String value) {
+    if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+        value = value.replace("\"", "\"\""); // escape double quotes
+        return "\"" + value + "\"";
+    }
+    return value;
+}
 
     // Add new auction item
     public void addItem(String itemName, String description, String startPrice, String duration) {

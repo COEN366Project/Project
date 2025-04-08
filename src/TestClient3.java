@@ -67,6 +67,7 @@ public class TestClient3 {
             System.out.println("2. Subscribe to Item");
             System.out.println("3. Bid on Item");
             System.out.println("4. Deregister");
+            System.out.println("5. DE-Subscribe");
             System.out.println("0. Exit");
 
             while (true) {
@@ -83,6 +84,7 @@ public class TestClient3 {
                     case 2 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " Camera");
                     case 3 -> client.sendMessage("BID " + client.requestId++ + " Camera 550");
                     case 4 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Alice");
+                    case 5 -> client.sendMessage("DE-SUBSCRIBE " + client.requestId++ + " Camera");
                     default -> System.out.println("Invalid option.");
                 }
             }

@@ -32,8 +32,10 @@ public class TestClient2 {
                     String[] parts = msg.split(" ");
                     String rq = parts[1];
                     String item = parts[2];
-                    String newPrice = String.valueOf(Double.parseDouble(parts[3]) - 50);
-                    writer.println("ACCEPT " + rq + " " + item + " " + newPrice);
+                    String currentPrice = parts[3];
+                    String newPrice = String.valueOf(Double.parseDouble(currentPrice) - 50); // Automatically lower the price by 50
+                    System.out.println("[NEGOTIATION] " + item + " at " + currentPrice + ". New price: " + newPrice);
+                    writer.println("ACCEPT " + rq + " " + item + " " + newPrice);  // Respond with ACCEPT and new price
                 } else if (msg.startsWith("INFORM_Req")) {
                     String[] parts = msg.split(" ");
                     String rq = parts[1];
@@ -85,7 +87,7 @@ public class TestClient2 {
                         return;
                     }
                     case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Bob seller 127.0.0.1 " + client.socket.getLocalPort() + " " + TCP_PORT);
-                    case 2 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " Camera NikonD750 500 5s");
+                    case 2 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " Camera NikonD750 500 60s");
                     case 3 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Bob");
                     default -> System.out.println("Invalid option.");
                 }

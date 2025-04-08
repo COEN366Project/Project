@@ -448,7 +448,7 @@ public class Client {
         switch (command) {
             case "AUCTION_ANNOUNCE":
                 handleAuctionAnnounce(parts);
-                break;
+                break; 
             case "BID_UPDATE":
                 handleBidUpdate(parts);
                 break;
