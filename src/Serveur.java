@@ -94,7 +94,7 @@
      private static void runDebugConsole() {
          Scanner scanner = new Scanner(System.in);
          while (true) {
-             System.out.println("\n[DEBUG] Type 1: Clients, 2: Items, 3: Auctions");
+             System.out.println("\n[DEBUG] Type 1: Clients, 2: Items, 3: Auctions, 4: Trigger BID_UPDATE manually\n");
              String input = scanner.nextLine();
              switch (input.trim()) {
                  case "1" -> System.out.println("[DEBUG] Registered clients: " + clients.size());
@@ -107,6 +107,23 @@
                      for (Auction a : auctions.values()) {
                          System.out.println("[AUCTION] " + a.itemName + " Seller: " + a.sellerName);
                      }
+                 }
+                 case "4" -> {
+                    System.out.print("Enter item name: ");
+                    String itemName = scanner.nextLine();
+                    Auction auction = auctions.get(itemName);
+                    if (auction == null) {
+                        System.out.println("[ERROR] No such auction found.");
+                    break;
+                }
+
+                    double highestBid = currentBids.getOrDefault(itemName, auction.startPrice);
+                    String highestBidder = highestBidders.getOrDefault(itemName, "None");
+                    long timeLeft = (auction.endTime - System.currentTimeMillis()) / 1000;
+                    String bidUpdateMsg = "BID_UPDATE " + (++requestIdCounter) + " " + itemName + " " + highestBid + " " + highestBidder + " " + timeLeft + "s";
+
+                    broadcastUpdate(bidUpdateMsg, itemName);
+                    System.out.println("[MANUAL BROADCAST] Sent BID_UPDATE for " + itemName);
                  }
                  default -> System.out.println("[DEBUG] Invalid option.");
              }
