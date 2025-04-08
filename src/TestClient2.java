@@ -3,7 +3,7 @@ import java.io.*;
 import java.util.Scanner;
 
 public class TestClient2 {
-    private static final String SERVER_IP = "127.0.0.1";
+    private static final String SERVER_IP = "192.168.189.4";
     private static final int SERVER_PORT = 5000;
     private static final int TCP_PORT = 7002;
     private DatagramSocket listenerSocket;
@@ -126,7 +126,7 @@ public class TestClient2 {
                         System.out.println("Disconnected.");
                         return;
                     }
-                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Bob seller 127.0.0.1 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
+                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Bob seller 192.168.189.5 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
                     case 2 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " Camera NikonD750 500 60s");
                     case 3 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Bob");
                     case 4 -> client.sendTCPMessage("ACCEPT " + client.requestId++ + " Camera 450");

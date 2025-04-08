@@ -112,19 +112,27 @@
                     System.out.print("Enter item name: ");
                     String itemName = scanner.nextLine();
                     Auction auction = auctions.get(itemName);
-                    if (auction == null) {
-                        System.out.println("[ERROR] No such auction found.");
-                    break;
-                }
-
+                
+                    // Check if the auction exists and if the end time is still valid
+                    if (auction == null || auction.endTime <= System.currentTimeMillis()) {
+                        System.out.println("[ERROR] No such auction found or the auction has already ended.");
+                        break;  // Exit the case if auction doesn't exist or has ended
+                    }
+                
+                    // Determine the highest bid and bidder
                     double highestBid = currentBids.getOrDefault(itemName, auction.startPrice);
                     String highestBidder = highestBidders.getOrDefault(itemName, "None");
+                
+                    // Calculate remaining time for auction
                     long timeLeft = (auction.endTime - System.currentTimeMillis()) / 1000;
+                
+                    // Prepare the bid update message
                     String bidUpdateMsg = "BID_UPDATE " + (++requestIdCounter) + " " + itemName + " " + highestBid + " " + highestBidder + " " + timeLeft + "s";
-
+                
+                    // Broadcast the update only if the auction is still ongoing
                     broadcastUpdate(bidUpdateMsg, itemName);
                     System.out.println("[MANUAL BROADCAST] Sent BID_UPDATE for " + itemName);
-                 }
+                }
                  default -> System.out.println("[DEBUG] Invalid option.");
              }
          }
