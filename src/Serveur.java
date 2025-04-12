@@ -204,17 +204,55 @@
              }
              case "SUBSCRIBE": {
                 String name = findClientNameByAddress(ip);
-                System.out.println("SUB NAME:"+name);
+                System.out.println("SUB NAME:" + name);
+                
                 if (name == null || !clients.containsKey(name)) {
                     return "SUBSCRIPTION_DENIED " + rq;
-                }else{
-                 String item = parts[2];
-                 subscriptions.putIfAbsent(item, ConcurrentHashMap.newKeySet());
-                 subscriptions.get(item).add(name);
-                 return "SUBSCRIBED " + rq;
+                } else {
+                    String item = parts[2];
+                    
+                    // Check if item exists in auctions
+                    if (!auctions.containsKey(item)) {
+                        return "SUBSCRIPTION_DENIED " + rq + " ITEM_NOT_FOUND";
+                    }
+                    
+                    // Initialize the set if not present
+                    subscriptions.putIfAbsent(item, ConcurrentHashMap.newKeySet());
+                    
+                    // Check if user is already subscribed to this item
+                    /*
+                    if (subscriptions.get(item).contains(name)) {
+                        return "SUBSCRIPTION_DENIED " + rq + " ALREADY_SUBSCRIBED";
+                    }*/
+                    
+                    // Add subscription
+                    subscriptions.get(item).add(name);
+                    
+                    // Send current auction info to the new subscriber
+                    Auction auction = auctions.get(item);
+                    ClientInfo client = clients.get(name);
+                    long timeLeftMs = auction.endTime - System.currentTimeMillis();
+                    String timeLeftStr = timeLeftMs > 0 ? (timeLeftMs / 1000) + "s" : "0s";
+                    double currentPrice = currentBids.getOrDefault(item, auction.startPrice);
+                    
+                    try {
+                        DatagramSocket socket = new DatagramSocket();
+                        String announcement = "AUCTION_ANNOUNCE " + rq + " " + item + " " + 
+                                             auction.description.replace(' ', '_') + " " + 
+                                             currentPrice + " " + timeLeftStr;
+                        byte[] buf = announcement.getBytes();
+                        DatagramPacket packet = new DatagramPacket(buf, buf.length, 
+                                                InetAddress.getByName(client.ip), client.udpPort);
+                        socket.send(packet);
+                        socket.close();
+                        System.out.println("[UDP Broadcast] Sent to " + name + " | " + announcement);
+                    } catch (IOException e) {
+                        System.err.println("[UDP Error] Failed to send auction info to " + name);
+                    }
+                    
+                    return "SUBSCRIBED " + rq;
                 }
-             }
-
+            }
              case "DE-SUBSCRIBE": {
                 String name = findClientNameByAddress(ip);
                 System.out.println("UNSUB NAME: " + name);

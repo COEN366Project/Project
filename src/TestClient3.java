@@ -116,13 +116,13 @@ public class TestClient3 {
                         System.out.println("Disconnected.");
                         return;
                     }
-                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Alice buyer 127.0.0.1 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
+                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Alice buyer 127.0.0.2 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
                     case 2 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
                     case 3 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 520");
                     case 4 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 570");
                     case 5 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 490");
                     case 6 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
-                    case 7 -> client.sendMessage("UNSUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
+                    case 7 -> client.sendMessage("DE-SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
                     case 8 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Alice");
                     default -> System.out.println("Invalid option.");
                 }

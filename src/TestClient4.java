@@ -115,12 +115,12 @@ public class TestClient4 {
                         System.out.println("Disconnected.");
                         return;
                     }
-                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Charlie buyer 127.0.0.1 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
+                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Charlie buyer 127.0.0.3 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
                     case 2 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
                     case 3 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 550");
                     case 4 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 600");
                     case 5 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 650");
-                    case 6 -> client.sendMessage("UNSUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
+                    case 6 -> client.sendMessage("DE-SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
                     case 7 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Charlie");
                     default -> System.out.println("Invalid option.");
                 }
