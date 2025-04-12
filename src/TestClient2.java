@@ -6,22 +6,28 @@ public class TestClient2 {
     private static final String SERVER_IP = "127.0.0.1";
     private static final int SERVER_PORT = 5000;
     private static final int TCP_PORT = 7002;
-    private DatagramSocket listenerSocket;
+    private DatagramSocket listenerSocket;      // Used solely for receiving broadcasts.
+    private DatagramSocket requestSocket;       // Used for sending commands and waiting for replies.
     private InetAddress serverAddress;
     private int requestId = 200;
+    private static final String CLIENT_ID = "Bob";  // Unique client identifier
     private static final String ITEM_NAME = "Camera";
     private static final String ITEM_DESC = "NikonD750";
     private static final String ITEM_PRICE = "500";
 
     public TestClient2() throws Exception {
-        listenerSocket = new DatagramSocket();  // Shared socket for listening only
+        // Create the listenerSocket (its port is used during registration).
+        listenerSocket = new DatagramSocket();  
         serverAddress = InetAddress.getByName(SERVER_IP);
         System.out.println("Bob (Seller) started on port: " + listenerSocket.getLocalPort());
 
-        // Start TCP listener
+        // Create a separate socket for request/response operations.
+        requestSocket = new DatagramSocket();
+
+        // Start TCP listener thread.
         new Thread(this::listenTCP).start();
 
-        // Start UDP listener
+        // Start UDP broadcast listener thread.
         new Thread(() -> {
             try {
                 byte[] buffer = new byte[1024];
@@ -57,13 +63,12 @@ public class TestClient2 {
                 } else if (msg.startsWith("INFORM_Req")) {
                     String[] parts = msg.split(" ");
                     String rq = parts[1];
-                    writer.println("INFORM_Res " + rq + " Bob 9999-8888-7777-6666 12/26 123_Seller_Street");
+                    writer.println("INFORM_Res " + rq + " " + CLIENT_ID + " 9999-8888-7777-6666 12/26 123_Seller_Street");
                 } else if (msg.startsWith("SOLD")) {
                     System.out.println("🎉 Your item has been sold!");
                 } else if (msg.startsWith("NON_OFFER")) {
                     System.out.println("⚠️ Your item received no bids and the auction has ended.");
                 }
-
                 clientSocket.close();
             }
         } catch (IOException e) {
@@ -71,17 +76,18 @@ public class TestClient2 {
         }
     }
 
-    // Sends a UDP message using a temporary DatagramSocket
+    // Use the separate requestSocket for sending and waiting for a reply.
     public void sendMessage(String message) throws Exception {
-        try (DatagramSocket tempSocket = new DatagramSocket()) {
-            byte[] data = message.getBytes();
-            DatagramPacket packet = new DatagramPacket(data, data.length, serverAddress, SERVER_PORT);
-            tempSocket.send(packet);
+        byte[] data = message.getBytes();
+        DatagramPacket packet = new DatagramPacket(data, data.length, serverAddress, SERVER_PORT);
+        requestSocket.send(packet);
 
-            byte[] buffer = new byte[1024];
-            DatagramPacket response = new DatagramPacket(buffer, buffer.length);
-            tempSocket.setSoTimeout(3000); // Optional: timeout
-            tempSocket.receive(response);
+        // Wait for a response on the requestSocket.
+        byte[] buffer = new byte[1024];
+        DatagramPacket response = new DatagramPacket(buffer, buffer.length);
+        requestSocket.setSoTimeout(3000); // Set a timeout as needed.
+        try {
+            requestSocket.receive(response);
             String reply = new String(response.getData(), 0, response.getLength());
             System.out.println("[UDP <- Server] " + reply);
         } catch (SocketTimeoutException e) {
@@ -91,6 +97,7 @@ public class TestClient2 {
 
     public void close() {
         listenerSocket.close();
+        requestSocket.close();
     }
 
     public void sendTCPMessage(String message) {
@@ -127,18 +134,18 @@ public class TestClient2 {
             while (true) {
                 System.out.print("\nSelect option: ");
                 int choice = Integer.parseInt(scanner.nextLine());
-
                 switch (choice) {
                     case 0 -> {
                         client.close();
                         System.out.println("Disconnected.");
                         return;
                     }
-                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Bob seller 127.0.0.1 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
-                    case 2 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 30s");
-                    case 3 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 60s");
-                    case 4 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 120s");
-                    case 5 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Bob");
+                    // For every command (except TCP ones), we include the client identifier.
+                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " " + CLIENT_ID + " seller 127.0.0.1 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
+                    case 2 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 30s " + CLIENT_ID);
+                    case 3 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 60s " + CLIENT_ID);
+                    case 4 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 120s " + CLIENT_ID);
+                    case 5 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " " + CLIENT_ID);
                     case 6 -> {
                         System.out.print("Enter new price (default: 450): ");
                         String input = scanner.nextLine();

@@ -6,20 +6,25 @@ public class TestClient3 {
     private static final String SERVER_IP = "127.0.0.1";
     private static final int SERVER_PORT = 5000;
     private static final int TCP_PORT = 7003;
-    private DatagramSocket listenerSocket;
+    private DatagramSocket listenerSocket;      // For broadcast messages
+    private DatagramSocket requestSocket;       // For request-response operations
     private InetAddress serverAddress;
     private int requestId = 300;
+    private static final String CLIENT_ID = "Alice"; // Unique client identifier
     private static final String ITEM_NAME = "Camera";
 
     public TestClient3() throws Exception {
+        // Create the listener socket (its port is used for registration)
         listenerSocket = new DatagramSocket();
+        // Create a dedicated request socket for sending commands.
+        requestSocket = new DatagramSocket();
         serverAddress = InetAddress.getByName(SERVER_IP);
         System.out.println("Alice (Buyer) started on port: " + listenerSocket.getLocalPort());
         
-        // Start TCP listener
+        // Start TCP listener thread
         new Thread(this::listenTCP).start();
         
-        // Start UDP listener
+        // Start UDP broadcast listener thread
         new Thread(() -> {
             try {
                 byte[] buffer = new byte[1024];
@@ -56,7 +61,7 @@ public class TestClient3 {
                 if (msg.startsWith("INFORM_Req")) {
                     String[] parts = msg.split(" ");
                     String rq = parts[1];
-                    writer.println("INFORM_Res " + rq + " Alice 4444-3333-2222-1111 01/27 789_Buyer_Street");
+                    writer.println("INFORM_Res " + rq + " " + CLIENT_ID + " 4444-3333-2222-1111 01/27 789_Buyer_Street");
                 } else if (msg.startsWith("WINNER")) {
                     System.out.println("🎉 CONGRATULATIONS! You won the auction!");
                 }
@@ -68,17 +73,18 @@ public class TestClient3 {
         }
     }
 
-    // Sends a UDP message using a temporary DatagramSocket
+    // Use the dedicated requestSocket for sending commands and waiting for replies.
     public void sendMessage(String message) throws Exception {
-        try (DatagramSocket tempSocket = new DatagramSocket()) {
-            byte[] data = message.getBytes();
-            DatagramPacket packet = new DatagramPacket(data, data.length, serverAddress, SERVER_PORT);
-            tempSocket.send(packet);
+        byte[] data = message.getBytes();
+        DatagramPacket packet = new DatagramPacket(data, data.length, serverAddress, SERVER_PORT);
+        requestSocket.send(packet);
 
-            byte[] buffer = new byte[1024];
-            DatagramPacket response = new DatagramPacket(buffer, buffer.length);
-            tempSocket.setSoTimeout(3000); // Optional: timeout
-            tempSocket.receive(response);
+        // Wait for a response on the requestSocket.
+        byte[] buffer = new byte[1024];
+        DatagramPacket response = new DatagramPacket(buffer, buffer.length);
+        requestSocket.setSoTimeout(3000); // Set timeout as needed.
+        try {
+            requestSocket.receive(response);
             String reply = new String(response.getData(), 0, response.getLength());
             System.out.println("[UDP <- Server] " + reply);
         } catch (SocketTimeoutException e) {
@@ -88,6 +94,7 @@ public class TestClient3 {
 
     public void close() {
         listenerSocket.close();
+        requestSocket.close();
     }
 
     public static void main(String[] args) {
@@ -116,14 +123,16 @@ public class TestClient3 {
                         System.out.println("Disconnected.");
                         return;
                     }
-                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Alice buyer 127.0.0.2 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
-                    case 2 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
-                    case 3 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 520");
-                    case 4 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 570");
-                    case 5 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 490");
-                    case 6 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
-                    case 7 -> client.sendMessage("DE-SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME);
-                    case 8 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Alice");
+                    // Each command now includes the client identifier as the last argument.
+                    case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " " + CLIENT_ID + " buyer 127.0.0.1 " +
+                             client.listenerSocket.getLocalPort() + " " + TCP_PORT);
+                    case 2 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME + " " + CLIENT_ID);
+                    case 3 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 520 " + CLIENT_ID);
+                    case 4 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 570 " + CLIENT_ID);
+                    case 5 -> client.sendMessage("BID " + client.requestId++ + " " + ITEM_NAME + " 490 " + CLIENT_ID);
+                    case 6 -> client.sendMessage("SUBSCRIBE " + client.requestId++ + " " + ITEM_NAME + " " + CLIENT_ID);
+                    case 7 -> client.sendMessage("UNSUBSCRIBE " + client.requestId++ + " " + ITEM_NAME + " " + CLIENT_ID);
+                    case 8 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " " + CLIENT_ID);
                     default -> System.out.println("Invalid option.");
                 }
             }
