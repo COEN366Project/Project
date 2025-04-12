@@ -9,6 +9,9 @@ public class TestClient2 {
     private DatagramSocket listenerSocket;
     private InetAddress serverAddress;
     private int requestId = 200;
+    private static final String ITEM_NAME = "Camera";
+    private static final String ITEM_DESC = "NikonD750";
+    private static final String ITEM_PRICE = "500";
 
     public TestClient2() throws Exception {
         listenerSocket = new DatagramSocket();  // Shared socket for listening only
@@ -55,6 +58,10 @@ public class TestClient2 {
                     String[] parts = msg.split(" ");
                     String rq = parts[1];
                     writer.println("INFORM_Res " + rq + " Bob 9999-8888-7777-6666 12/26 123_Seller_Street");
+                } else if (msg.startsWith("SOLD")) {
+                    System.out.println("🎉 Your item has been sold!");
+                } else if (msg.startsWith("NON_OFFER")) {
+                    System.out.println("⚠️ Your item received no bids and the auction has ended.");
                 }
 
                 clientSocket.close();
@@ -109,11 +116,12 @@ public class TestClient2 {
 
             System.out.println("\n--- Bob (Seller) Menu ---");
             System.out.println("1. Register");
-            System.out.println("2. List Item");
-            System.out.println("3. Deregister");
-            System.out.println("4. Send TCP ACCEPT");
-            System.out.println("5. Send TCP REFUSE");
-            System.out.println("6. Send TCP INFORM_Res");
+            System.out.println("2. List Item (30s auction)");
+            System.out.println("3. List Item (60s auction)");
+            System.out.println("4. List Item (120s auction)");
+            System.out.println("5. Deregister");
+            System.out.println("6. Send TCP ACCEPT");
+            System.out.println("7. Send TCP REFUSE");
             System.out.println("0. Exit");
 
             while (true) {
@@ -127,11 +135,17 @@ public class TestClient2 {
                         return;
                     }
                     case 1 -> client.sendMessage("REGISTER " + client.requestId++ + " Bob seller 127.0.0.1 " + client.listenerSocket.getLocalPort() + " " + TCP_PORT);
-                    case 2 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " Camera NikonD750 500 60s");
-                    case 3 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Bob");
-                    case 4 -> client.sendTCPMessage("ACCEPT " + client.requestId++ + " Camera 450");
-                    case 5 -> client.sendTCPMessage("REFUSE " + client.requestId++ + " Camera");
-                    case 6 -> client.sendTCPMessage("INFORM_Res " + client.requestId++ + " Bob 9999-8888-7777-6666 12/26 123_Seller_Street");
+                    case 2 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 30s");
+                    case 3 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 60s");
+                    case 4 -> client.sendMessage("LIST_ITEM " + client.requestId++ + " " + ITEM_NAME + " " + ITEM_DESC + " " + ITEM_PRICE + " 120s");
+                    case 5 -> client.sendMessage("DE-REGISTER " + client.requestId++ + " Bob");
+                    case 6 -> {
+                        System.out.print("Enter new price (default: 450): ");
+                        String input = scanner.nextLine();
+                        String newPrice = input.isEmpty() ? "450" : input;
+                        client.sendTCPMessage("ACCEPT " + client.requestId++ + " " + ITEM_NAME + " " + newPrice);
+                    }
+                    case 7 -> client.sendTCPMessage("REFUSE " + client.requestId++ + " " + ITEM_NAME);
                     default -> System.out.println("Invalid option.");
                 }
             }
